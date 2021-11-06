@@ -1,0 +1,22 @@
+{
+  "name": "webrtc-perf",
+  "type": "module",
+  "version": "0.0.1",
+  "description": "",
+  "main": "peer-client.js",
+  "dependencies": {
+    "ws": "^8.2.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "elmisback",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^16.7.10",
+    "node-pre-gyp": "^0.17.0",
+    "node-gyp": "^8.4.0",
+    "wrtc": "^0.4.7",
+    "ws": "^8.2.3"
+  }
+}

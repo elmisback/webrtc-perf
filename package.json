@@ -2,7 +2,7 @@
   "name": "webrtc-perf",
   "type": "module",
   "version": "0.0.1",
-  "main": "peer-client.js",
+  "main": "host.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

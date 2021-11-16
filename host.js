@@ -1,5 +1,6 @@
 import {WebSocket} from "ws"
 import pkg from 'wrtc'
+const {RTCPeerConnection} = pkg;
 import {
     default_auth_key_import,
     default_decrypt,
@@ -7,9 +8,9 @@ import {
     default_encryption_key_import,
     default_key_export,
     default_sign,
-    default_verify,
+    default_verify, export_private_key,
     generateECDHKeyPair,
-    generateECDSAKeyPair
+    generateECDSAKeyPair, import_private_key, import_public_key
 } from "./auth.js";
 
 let basic_signaling_server_config = (peer_key, send_chan, receive_chan)=> {
@@ -169,6 +170,20 @@ let host = async ({
         }
     }
 }
-let auth_key_pair = await generateECDSAKeyPair()
+
+let auth_key_pair
+if ("private-key" in args) {
+    let private_key = fs.readFileSync(args["private-key"])
+    private_key = await import_private_key(private_key)
+    let public_key = fs.readFileSync(args["public-key"])
+    public_key = await import_public_key(public_key)
+
+    auth_key_pair = {publicKey: public_key, privateKey: private_key}
+} else {
+    auth_key_pair = await generateECDSAKeyPair()
+    fs.writeFileSync("private.key", await export_private_key(auth_key_pair))
+    fs.writeFileSync("public.key", await default_key_export(auth_key_pair))
+}
 const signalling_hostname = process.env.SIGNALLING_HOSTNAME || "localhost:8443"
+console.log(`Starting host with key ${await default_key_export(auth_key_pair)}`)
 host({auth_key_pair, signalling_hostname: signalling_hostname})

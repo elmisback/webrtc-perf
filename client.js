@@ -1,5 +1,6 @@
 import {WebSocket} from "ws"
 import pkg from 'wrtc'
+const {RTCPeerConnection} = pkg;
 import {
     default_auth_key_import,
     default_decrypt,
@@ -11,8 +12,11 @@ import {
     generateECDHKeyPair,
     generateECDSAKeyPair
 } from "./auth.js";
+import parseArgs from "minimist";
+import * as fs from "fs";
 
-const {RTCPeerConnection} = pkg;
+const args = parseArgs(process.argv.slice(2))
+
 
 
 let connectToHost = async ({
@@ -147,10 +151,11 @@ let connectToHost = async ({
 }
 
 
-const host = "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEGZDICs222YwVaM6F6goKRq5yihNPRetotApDnfhsie4b7Lj/rqK95pymiJRL7gelk0xgS+6o8KQaHABi6SSBz3bvikuLi2KSX8HfSGkNnHKpkHhijivZeJlQDHuQFive"
+let host_public_key = fs.readFileSync(args["public-key"]).toString()
+
 
 const signalling_hostname = process.env.SIGNALLING_HOSTNAME || "localhost:8443"
-let channel = await connectToHost({host: host.trim(), signalling_hostname: signalling_hostname})
+let channel = await connectToHost({host: host_public_key, signalling_hostname: signalling_hostname})
 
 channel.send(JSON.stringify({action: 'join', channel: 'test'}))
 channel.send(JSON.stringify({action: 'list', channel: 'test'}))

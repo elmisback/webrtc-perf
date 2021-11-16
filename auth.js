@@ -78,7 +78,32 @@ export let default_encryption_key_import = base64 => crypto.subtle.importKey(
     false,
     []
 )
+
+export let import_private_key = base64 => crypto.subtle.importKey(
+    'pkcs8',
+    base64ToArrayBuffer(base64),
+    {
+        name: 'ECDSA',
+        namedCurve: ECDSA_CURVE
+    },
+    true,
+    ["sign"]
+)
+
+export let import_public_key = base64 => crypto.subtle.importKey(
+    'spki',
+    base64ToArrayBuffer(base64),
+    {
+        name: 'ECDH',
+        namedCurve: ECDH_CURVE
+    },
+    true,
+    []
+)
+
 export let default_key_export = async k => arrayBufferToBase64(await crypto.subtle.exportKey('spki', k.publicKey))
+
+export let export_private_key = async k => arrayBufferToBase64(await crypto.subtle.exportKey('pkcs8', k.privateKey))
 
 // from https://stackoverflow.com/questions/9267899/arraybuffer-to-base64-encoded-string
 function arrayBufferToBase64(buffer) {

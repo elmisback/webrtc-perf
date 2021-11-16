@@ -12,6 +12,100 @@ import {
     generateECDHKeyPair,
     generateECDSAKeyPair, import_private_key, import_public_key
 } from "./auth.js";
+import parseArgs from "minimist";
+import * as fs from "fs";
+
+const args = parseArgs(process.argv.slice(2))
+
+let g_connections = []
+
+let server_connections = []
+
+let sessions = []
+
+let no_ping = {}
+let serverPing
+
+let get_client = ({id, send}) => {
+    if (server_connections[id]) throw Error('That id exists.')
+    const result = request => {
+        request == 'pong' ? delete no_ping[id] : handle_request({...request, client_id: id})
+    }
+    server_connections[id] = send(result)
+    return result
+}
+
+let update_clients = (session) => {
+    Object.keys(session).map(id => server_connections[id] && server_connections[id]({ client_id: id, action: 'list', response: Object.keys(session)}))
+}
+
+let handle_request = (args) => {  // handle client message
+    let {action, client_id, channel, name=channel, recipient, body, sender} = args
+    const err = msg => (console.log(msg), server_connections[client_id]({error: msg}))
+    console.log('Server: request:', args)
+    const K = Object.keys
+    const V = Object.values
+    const s = K(sessions).find(name1 => name1 == name)
+        || (!name && V(sessions).find(s => s[client_id])) || undefined;
+
+    const R = args => {
+        console.log('responding', args)
+        server_connections[client_id]({action, response: args, client_id})
+        console.log('responded')
+    }
+    const session = sessions[s] || s
+    const ops = {
+        list: () =>
+            s ? R(K(session))
+                : R({sessions: K(sessions)
+                        .map(s => ({name: s.name}))}),
+        join: () => {
+            if (!name) return err(`can't join with session name ${name}`)
+            if (!session) return sessions[name] = {[client_id] : true}
+            session[client_id] = true
+            update_clients(session)
+        },
+        leave: () => {
+            const session = sessions[s]
+            if (!s || !session || !session[client_id]) return err(`You're not in that session.`)
+            delete session[client_id] && update_clients(session)
+            if (Object.keys(session).length == 0) delete sessions[s]
+            return true
+        },
+        message: () =>
+            !s ? err("You need to be in a session to send a message.")
+                : !(session[client_id] && session[recipient]) ? err("Couldn't find that recipient in your session.")
+                    : server_connections[recipient]({action, sender: client_id, name, body, recipient})
+    }
+    if (!Object.keys(ops).includes(action)) {console.log('Invalid action'); return}
+
+    ops[action]()
+}
+
+let set_heartbeat_timeout = (ms=3000) => {
+    if (serverPing) clearInterval(serverPing)
+    serverPing = setInterval(() => {
+        let updated_sessions = ({})
+        // remove clients that have died
+        Object.keys(no_ping).map(client_id => {
+            console.log('Dropping', client_id)
+            delete server_connections[client_id]
+            Object.keys(sessions).map(s => {
+                updated_sessions[s] = true
+                delete sessions[s][client_id]
+                if (Object.keys(s).length == 0) delete sessions[s]
+            })
+            delete no_ping[client_id]
+        })
+        // notify living clients about dead clients
+        Object.keys(updated_sessions).map(s => sessions[s] && update_clients(sessions[s]))
+
+        // handle next iteration
+        Object.keys(server_connections).map(u => no_ping[u] = true)
+        Object.values(server_connections).map(c => setTimeout(() => c('ping')))
+    }, ms)
+}
+
 
 let basic_signaling_server_config = (peer_key, send_chan, receive_chan)=> {
     const client = get_client({id: peer_key, send: rec => o => send_chan.readyState == 'open' && send_chan.send(JSON.stringify(o))})

@@ -87,7 +87,10 @@ let connectToHost = async ({
     const chan = peer_connection.createDataChannel('channel-name')
     peer_connection.onicecandidate = async ({ candidate }) => {
         console.log(candidate)
-        candidates.push(candidate)
+        if (candidate !== null) {
+            // null signals that gathering is complete. We won't send the null along
+            candidates.push(candidate)
+        }
         if (candidate == null && peer_connection.connectionState != 'connected') {
             // NOTE This condition may not be exactly correct
             // Example: if connectionState is 'failed'

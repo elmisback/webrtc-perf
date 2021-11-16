@@ -121,7 +121,10 @@ let host = async ({
             // }
             peer_connection.onicecandidate = async ({ candidate }) => {
                 console.debug('host.onicecandidate', candidate)
-                candidates.push(candidate)
+                if (candidate !== null) {
+                    // null signals that gathering is complete. We won't send the null along
+                    candidates.push(candidate)
+                }
                 if (candidate == null && peer_connection.connectionState != 'connected' && !connections[from].in_candidate_gather_pause) {
                     // NOTE This condition may not be exactly correct
                     // Example: if connectionState is 'failed'

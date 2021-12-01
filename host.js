@@ -10,7 +10,7 @@ import {
     default_sign,
     default_verify, export_private_key,
     generateECDHKeyPair,
-    generateECDSAKeyPair, import_private_key, import_public_key
+    generateECDSAKeyPair, import_private_key, import_public_key, shorten_key
 } from "./auth.js";
 import parseArgs from "minimist";
 import * as fs from "fs";
@@ -152,8 +152,8 @@ let host = async ({
         ws.send(JSON.stringify(object))
     }
     const connections = {}
-    ws.onerror = async event => console.log('Host:', await auth_key_export(auth_key_pair), 'error. Event:', event)
-    ws.onclose = async event => console.log('Host:', await auth_key_export(auth_key_pair), 'websocket connection closed. Event:', {reason: event.reason, code: event.code, wasClean: event.wasClean})
+    ws.onerror = async event => console.log('Host:', shorten_key(await auth_key_export(auth_key_pair)), 'error. Event:', event)
+    ws.onclose = async event => console.log('Host:', shorten_key(await auth_key_export(auth_key_pair)), 'websocket connection closed. Event:', {reason: event.reason, code: event.code, wasClean: event.wasClean})
     ws.onmessage = async ({ data }) => {
         if (data == 'ping') return ws.send('pong')
         console.debug('host.ws.onmessage.data:', data)
@@ -282,5 +282,5 @@ if ("private-key" in args) {
     fs.writeFileSync("public.key", await default_key_export(auth_key_pair))
 }
 const signalling_hostname = process.env.SIGNALLING_HOSTNAME || "localhost:8443"
-console.log(`Starting host with key ${await default_key_export(auth_key_pair)}`)
+console.log(`Starting host with key ${shorten_key(await default_key_export(auth_key_pair))}`)
 host({auth_key_pair, signalling_hostname: signalling_hostname})

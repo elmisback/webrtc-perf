@@ -140,3 +140,7 @@ let deriveSecretKey = (privateKey, publicKey) => crypto.subtle.deriveKey(
     false,
     ["encrypt", "decrypt"]
 )
+
+export let shorten_key = (key_string) => {
+    return key_string.substr(32,8)
+}

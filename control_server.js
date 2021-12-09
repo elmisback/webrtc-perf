@@ -264,32 +264,17 @@ channel.onmessage = (({data}) => {
 })
 
 await channel.send(JSON.stringify({action: 'join', channel: 'test'}))
-await channel.send(JSON.stringify({ action: 'list', channel: 'test' }))
+await channel.send(JSON.stringify({action: 'list', channel: 'test'}))
 
 
-/* Still need to create peer connections + datachannels with each and then listen for onmessage
-
-const {command} = JSON.parse(data)
-if (command) configure_connection(command)
-
-function configure_connection({call_id, from, to, type="data"}) {
-  const receive = to.includes("self")
-  to = to.filter(s => s != "self")
-  const output_channels = to.map(to_peer_id => pcs[to_peer_id].createDataChannel(`${call_id}-${to_peer_id}`))
-  if (!from) {
-    output_channels.map(dc => dc.onopen = () => dc.send(JSON.stringify({client_id, time: Date.now()})))
-  } else {
-    const old_ondatachannel = pcs[from].ondatachannel
-    pcs[from].ondatachannel = ({channel}) => {old_ondatachannel(); if (channel.label != call_id) { 
-      channel.onmessage = ({data}) => {
-        output_channels.map(dc => dc.send(data)) 
-        if (receive) {
-          mutable output_log.push({received: data, time: Date.now()})
-        }
-      }}}
-    pcs[from].createDataChannel(`${call_id}`)
-  }
+function traverse (t, f, parent=undefined) {  /* f : tree * 'a -> list of 'b */
+  return [...f(t, parent), ...Object.entries(t).map(([k,v]) => traverse(v, f, k)).flat()]
 }
 
+const tree = ({ "a": { "c1": { "b1": { self: true }, "b2": { self: true }, self: true }, "c2": { "b3": { self: true }, "b4": { self: true }, self: true } } })
 
-*/
+const translation = traverse(tree, (t, parent) => [parent]).filter(e => e && e != 'self').map((id, i) => ({ [id]: peers[i] }))
+
+const messages = traverse(tree, (t, parent) => [[t, parent]]).map(([t, parent]) => Object.entries(t).map(([k, v]) => k == "self" ? false : ({ from: parent, through: k, to: Object.keys(v) }))).flat().filter(e => e)
+
+// messages.map(({from, through, to}, i) => dcs[translation[through]].send(JSON.stringify({call_id: i, from: translation[from], to: to.map(s => translation[s])})))

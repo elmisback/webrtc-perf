@@ -21,6 +21,7 @@ const args = parseArgs(process.argv.slice(2))
 let message_handlers = ({})
 let peers = []
 let pcs = ({})
+let dcs = ({})
 let client_id
 
 let connectToHost = async ({
@@ -172,9 +173,12 @@ export let get_peer_connection = ({
     // let the "negotiationneeded" event trigger offer generation
     pc.onnegotiationneeded = async () => {
         console.log('negotiation needed')
+        if (polite) return;  // HACK hangs without this due to below bug :(
         try {
             makingOffer = true;
-            await pc.setLocalDescription();
+            // HACK Note there's a bug in node-webrtc that requires providing an offer/answer explicitly.
+            // See https://github.com/node-webrtc/node-webrtc/issues/677
+            await pc.setLocalDescription(await pc.createOffer());
             send_signaling_message({description: pc.localDescription});
         } catch (err) {
             console.error(err);
@@ -208,7 +212,7 @@ export let get_peer_connection = ({
                 }
                 isSettingRemoteAnswerPending = false;
                 if (description.type == "offer") {
-                    await pc.setLocalDescription();
+                    await pc.setLocalDescription(await pc.createAnswer());
                     send_signaling_message({description: pc.localDescription});
                 }
             } else if (candidate) {
@@ -234,30 +238,31 @@ export let get_peer_connection = ({
 
 let host_public_key = fs.readFileSync(args["host-key"]).toString()
 
-const name = process.env.NAME || null
+//const name = false //args["client-id"] || process.env.NAME || null
 let auth_key_pair
-if (name) {
-    try {
-        let private_key = fs.readFileSync(name)
-        private_key = await import_private_key(private_key)
-        let public_key = fs.readFileSync(name + ".pub")
-        public_key = await import_public_key(public_key)
+// if (name) {
+//     try {
+//         let private_key = fs.readFileSync(name)
+//         private_key = await import_private_key(private_key)
+//         let public_key = fs.readFileSync(name + ".pub")
+//         public_key = await import_public_key(public_key)
 
-        auth_key_pair = {publicKey: public_key, privateKey: private_key}
-    } catch {
-        // No keypair on disk for this name yet. Make one and store it
-        console.log("Saving keypair for " + name)
-        auth_key_pair = await generateECDSAKeyPair()
-        fs.writeFileSync(name, await export_private_key(auth_key_pair))
-        fs.writeFileSync(name + ".pub", await default_key_export(auth_key_pair))
-    }
-}
+//         auth_key_pair = {publicKey: public_key, privateKey: private_key}
+//     } catch {
+//         // No keypair on disk for this name yet. Make one and store it
+//         console.log("Saving keypair for " + name)
+//         auth_key_pair = await generateECDSAKeyPair()
+//         fs.writeFileSync(name, await export_private_key(auth_key_pair))
+//         fs.writeFileSync(name + ".pub", await default_key_export(auth_key_pair))
+//     }
+// }
 
 const signalling_hostname = process.env.SIGNALLING_HOSTNAME || "localhost:8443"
 console.log(`Connecting to host with key ${shorten_key(host_public_key)}`)
 let channel = await connectToHost({host: host_public_key, auth_key_pair: auth_key_pair, signalling_hostname: signalling_hostname})
 
-channel.onmessage = (({data}) => {
+channel.onmessage = (({ data }) => {
+    // handle signalling messages here
     data = JSON.parse(data)
     if (data == 'ping') {
         channel.send(JSON.stringify('pong'))
@@ -265,16 +270,35 @@ channel.onmessage = (({data}) => {
     }
     //console.debug(data);
     if (data.action == 'list') {
+        // data = {client_id: "my_id", response: ["peer_id1", "peer_id2"]}
+        // update the peer mesh with these peers
+        console.log('Got list command', data)
         client_id = data.client_id
         peers = data.response.filter(p => p != data.client_id)
-        peers.map(p => pcs[p] ? null : pcs = {...pcs, [p] : get_peer_connection({
-                polite: client_id < p,
-                send_signaling_message: obj => {
-            channel.send(JSON.stringify({action: 'message', body: JSON.stringify(obj), recipient: p}))
-            //console.debug('sending signaling message', obj, 'to', p)
-        },
-            install_signaling_message_handler: onmessage => message_handlers[p] = onmessage
-    })})
+        const old_pcs = pcs
+        pcs = {}
+        peers.map(p => pcs[p] = old_pcs[p] || get_peer_connection({
+                    polite: client_id < p,
+                    send_signaling_message: obj => {
+                channel.send(JSON.stringify({action: 'message', body: JSON.stringify(obj), recipient: p}))
+                //console.debug('sending signaling message', obj, 'to', p)
+            },
+                install_signaling_message_handler: onmessage => message_handlers[p] = onmessage
+            })
+        )
+        console.log(pcs)
+
+        // Make a simple mesh to check that connections are established.
+        const old_dcs = dcs
+        dcs = {}
+        Object.entries(pcs).map(([peer_id, pc]) => {
+            dcs[peer_id] = old_dcs[peer_id]
+            if (dcs[peer_id]) return;
+            pc.ondatachannel = ({ channel }) => channel.onmessage = ({data}) => console.log("Got data from peer", peer_id, data)
+            const dc = pc.createDataChannel("mesh")
+            dcs[peer_id] = dc
+            dc.onopen = () => dc.send(JSON.stringify({client_id, time: Date.now()}))
+        })
     } else if (data.action == 'message' && (data.sender in message_handlers)) {
         message_handlers[data.sender](JSON.parse(data.body))
     }
@@ -298,7 +322,7 @@ function configure_connection({call_id, from, to, type="data"}) {
     output_channels.map(dc => dc.onopen = () => dc.send(JSON.stringify({client_id, time: Date.now()})))
   } else {
     const old_ondatachannel = pcs[from].ondatachannel
-    pcs[from].ondatachannel = ({channel}) => {old_ondatachannel(); if (channel.label != call_id) { 
+    pcs[from].ondatachannel = ({channel}) => {old_ondatachannel(); if (channel.label != call_id) { // neq might be wrong?
       channel.onmessage = ({data}) => {
         output_channels.map(dc => dc.send(data)) 
         if (receive) {

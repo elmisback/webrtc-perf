@@ -315,7 +315,7 @@ let my_call_id
 
 function handle_command({ test, report, call_id, from, to, type = "data" }, controller_id) {
     if (test) {
-        outputs.map(dc => send(dc, { from: overlay_id, id: Math.random(), hops: 0, test: true, call_id: my_call_id}))
+        outputs.map(dc => send(dc, { from: overlay_id, last: overlay_id, id: Math.random(), hops: 0, test: true, call_id: my_call_id}))
         return
     }
     if (report) {

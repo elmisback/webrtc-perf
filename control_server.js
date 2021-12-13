@@ -290,7 +290,7 @@ channel.onmessage = (({ data }) => {
 
 const N_PEERS = 5
 let INITED = false
-let confirmed = []
+let confirmed = {}
 const translation_table = ({})
 
 // makes a simple chain call on a list of peers of length n
@@ -303,6 +303,14 @@ const simple_chain_from_index = (i, n) => ([...new Array(n)].map((_, j) => (((j 
 
 const handle_report = async ({ client_id, overlay_id, from }) => {
   console.log('handling report', client_id, overlay_id, from)
+  if (from) {
+    confirmed[from] = (confirmed[from] || 0) + 1
+    console.log(confirmed)
+    if (Object.values(confirmed).filter(v => v == N_PEERS - 1).length == N_PEERS) {
+      console.log('Overlay network established!')
+    }
+    return
+  }
   translation_table[overlay_id] = client_id
   const overlay_ids = Object.keys(translation_table)
   if (overlay_ids.length < N_PEERS || INITED) return;

@@ -254,7 +254,7 @@ let host = async ({
             await peer_connection.setRemoteDescription(JSON.parse(decrypted_answer))
             // NOTE we don't need to set the candidates since they're included in the description now.
             console.log(deferred_candidates)
-            if (deferred_candidates.length > 0) deferred_candidates.reverse().map(async c => await (peer_connection.addIceCandidate(c)))
+            if (deferred_candidates.length > 0) deferred_candidates.reverse().map(async c => c && await (peer_connection.addIceCandidate(c)))  // HACK doesn't like null candidates
             console.log('Remote description set successfully, connection should start once candidate exchange finishes...')
         } else if (candidates) {
             const { their_encryption_key, peer_connection, host_encryption_key_pair, deferred_candidates } = connections[from]

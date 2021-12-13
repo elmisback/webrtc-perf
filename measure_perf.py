@@ -1,24 +1,18 @@
 #!/usr/bin/python
-"Problem Set 2: Bufferbloat"
 
-from mininet.topo import Topo
-from mininet.node import CPULimitedHost
-from mininet.link import TCLink
-from mininet.net import Mininet
-from mininet.log import lg, info
-from mininet.util import dumpNodeConnections
-from mininet.cli import CLI
-
-from subprocess import Popen, PIPE
-from time import sleep, time
-from multiprocessing import Process
-from argparse import ArgumentParser
-
-import sys
 import os
-import math
+from argparse import ArgumentParser
+from subprocess import Popen
+from time import sleep
 
-parser = ArgumentParser(description="Bufferbloat tests")
+from mininet.link import TCLink, TCIntf
+from mininet.net import Mininet
+from mininet.node import CPULimitedHost
+from mininet.node import OVSController
+from mininet.topo import Topo
+from mininet.util import dumpNodeConnections
+
+parser = ArgumentParser(description="tests")
 parser.add_argument('--bw-host', '-B',
                     type=float,
                     help="Bandwidth of host links (Mb/s)",
@@ -58,52 +52,91 @@ parser.add_argument('--cong',
 
 # Expt parameters
 args = parser.parse_args()
+if args.dir:
+    args.dir = os.path.realpath(args.dir)
 
-class BBTopo(Topo):
-    "Simple topology for bufferbloat experiment."
+physical_links = {
+    "lookup": {"up": 200, "down": 200},
+    "h1": {"up": 10, "down": 100},
+    "h2": {"up": 3, "down": 10},
+    "h3": {"up": 8, "down": 20},
+    "h4": {"up": 8, "down": 20},
+    "h5": {"up": 8, "down": 20},
+}
 
-    def build(self, n=2):
-        h1 = self.addHost('h1')
-        h2 = self.addHost('h2')
-        h3 = self.addHost('h3')
 
-        # Here I have created a switch.  If you change its name, its
-        # interface names will change from s0-eth1 to newname-eth1.
+class AsymTCLink(TCLink):
+    "Link with potential asymmetric TC interfaces configured via opts"
+
+    def __init__(self, node1, node2, port1=None, port2=None,
+                 intfName1=None, intfName2=None,
+                 addr1=None, addr2=None, **params):
+        p1 = {}
+        p2 = {}
+        if 'params1' in params:
+            p1 = params['params1']
+            del params['params1']
+        if 'params2' in params:
+            p2 = params['params2']
+            del params['params2']
+
+        par1 = params.copy()
+        par1.update(p1)
+
+        par2 = params.copy()
+        par2.update(p2)
+
+        TCLink.__init__(self, node1, node2, port1=port1, port2=port2,
+                        intfName1=intfName1, intfName2=intfName2,
+                        cls1=TCIntf,
+                        cls2=TCIntf,
+                        addr1=addr1, addr2=addr2,
+                        params1=par1,
+                        params2=par2)
+
+
+class PerfTopo(Topo):
+    def build(self, layout):
         switch = self.addSwitch('s0')
+        for key, attributes in layout.items():
+            host = self.addHost(key)
 
-        self.addLink(switch,
-                     h1, cls=TCLink, bw=1000, delay='5ms',  max_queue_size=args.maxq)
-
-        self.addLink(switch,
-                     h2, bw=1.5, delay='5ms', max_queue_size=args.maxq)
-
-        self.addLink(switch,
-                             h3, bw=1.5, delay='5ms', max_queue_size=args.maxq)
+            self.addLink(switch,
+                         host, cls=AsymTCLink,
+                         params1={"bw": attributes["down"], "delay": '5ms', "max_queue_size": args.maxq},
+                         params2={"bw": attributes["up"], "delay": '5ms', "max_queue_size": args.maxq})
 
 
-def start_lookup_server(net):
-    h1 = net.get('h1')
-    proc = h1.popen("cd ../auth-rtc && node server.js > ../webrtc-perf/lookup_log.txt", shell=True)
+def start_lookup_server(net, name):
+    host = net.get(name)
+    proc = host.popen(f"cd ../auth-rtc && node server.js > {args.dir}/{name}_log.txt", shell=True)
     sleep(1)
     return [proc]
 
-def start_host(net):
-    h2 = net.get('h2')
-    proc = h2.popen(f"SIGNALLING_HOSTNAME={net.get('h1').IP()}:8443 node host.js --public-key public.key --private-key private.key > host_log.txt", shell=True)
+
+def start_host(net, name):
+    host = net.get(name)
+    proc = host.popen(
+        f"SIGNALLING_HOSTNAME={net.get('lookup').IP()}:8443 NAME={name} node host.js > {args.dir}/{name}_log.txt",
+        shell=True)
     sleep(1)
     return [proc]
 
-def start_client(net):
-    h3 = net.get('h3')
-    proc = h3.popen(f"SIGNALLING_HOSTNAME={net.get('h1').IP()}:8443 node client.js --public-key public.key > client_log.txt", shell=True)
+
+def start_client(net, name):
+    host = net.get(name)
+    proc = host.popen(
+        f"SIGNALLING_HOSTNAME={net.get('lookup').IP()}:8443 NAME={name} node client.js  --host-key h1.pub > {args.dir}/{name}_log.txt",
+        shell=True)
     sleep(1)
     return [proc]
 
-def bufferbloat():
+
+def measure_perf():
     if not os.path.exists(args.dir):
         os.makedirs(args.dir)
-    topo = BBTopo()
-    net = Mininet(topo=topo, host=CPULimitedHost, link=TCLink)
+    topo = PerfTopo(physical_links)
+    net = Mininet(topo=topo, host=CPULimitedHost, link=AsymTCLink, controller=OVSController)
     net.start()
     # This dumps the topology and how nodes are interconnected through
     # links.
@@ -111,11 +144,14 @@ def bufferbloat():
     # This performs a basic all pairs ping test.
     net.pingAll()
 
-    start_lookup_server(net)
+    start_lookup_server(net, "lookup")
 
-    start_host(net)
+    start_host(net, "h1")
 
-    start_client(net)
+    for key in physical_links.keys():
+        if key in ["lookup", "h1"]:
+            continue
+        start_client(net, key)
     sleep(10)
 
     net.stop()
@@ -123,5 +159,6 @@ def bufferbloat():
     # Sometimes they require manual killing.
     Popen("pgrep -f node | xargs kill -9", shell=True).wait()
 
+
 if __name__ == "__main__":
-    bufferbloat()
+    measure_perf()

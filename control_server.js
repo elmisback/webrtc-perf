@@ -319,7 +319,7 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
   // set of each-to-all chains:
   const chains = [...new Array(N_PEERS)].map((_, i) => ({ call_id: i, call: simple_chain_from_index(i + 1, N_PEERS) }))
 
-  const messages = chains.flatMap(({ call_id, call }) => get_messages(call).map(m => ({ call_id, ...m })))
+  const messages = chains.flatMap(({ call_id, call }) => get_messages(call).map(m => ({ call_id, ...m }))).reverse()  // HACK reverse to make sure datachannel handlers get init'd before datachannels? 
   /*
     for a connection like A -> B -> C and D
     the message to B looks like 
@@ -334,7 +334,7 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
   //console.log(translated)
   translated.map(m => send(dcs[m.through], { command: m }))
   
-  await new Promise(resolve => setTimeout(() => resolve(), 5000))
+  //await new Promise(resolve => setTimeout(() => resolve(), 5000))
 
   const peer_ids = Object.values(translation_table)
   peer_ids.map(peer_id => send(dcs[peer_id], { command: { test: true } }))

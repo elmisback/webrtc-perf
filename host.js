@@ -146,7 +146,7 @@ let host = async ({
 
     const candidate_gather_pause = 500  // ms to wait for ICE candidates
 
-    const ws = new WebSocket(`wss://${signalling_hostname}/host`)
+    const ws = new WebSocket(`wss://${signalling_hostname}/host`, {rejectUnauthorized: false})
     const send = object => {
         console.log('host.ws.send', object)
         ws.send(JSON.stringify(object))
@@ -247,7 +247,6 @@ let host = async ({
                 })
                 connections[from].in_candidate_gather_pause = false
             }, candidate_gather_pause)
-            return
         } else if (answer) {
             const { their_encryption_key, peer_connection, host_encryption_key_pair, deferred_candidates } = connections[from]
             const decrypted_answer = await decrypt(host_encryption_key_pair)(their_encryption_key, answer)
@@ -268,19 +267,25 @@ let host = async ({
     }
 }
 
+const name = process.env.NAME || null
 let auth_key_pair
-if ("private-key" in args) {
-    let private_key = fs.readFileSync(args["private-key"])
-    private_key = await import_private_key(private_key)
-    let public_key = fs.readFileSync(args["public-key"])
-    public_key = await import_public_key(public_key)
+if (name) {
+    try {
+        let private_key = fs.readFileSync(name)
+        private_key = await import_private_key(private_key)
+        let public_key = fs.readFileSync(name + ".pub")
+        public_key = await import_public_key(public_key)
 
-    auth_key_pair = {publicKey: public_key, privateKey: private_key}
-} else {
-    auth_key_pair = await generateECDSAKeyPair()
-    fs.writeFileSync("private.key", await export_private_key(auth_key_pair))
-    fs.writeFileSync("public.key", await default_key_export(auth_key_pair))
+        auth_key_pair = {publicKey: public_key, privateKey: private_key}
+    } catch {
+        // No keypair on disk for this name yet. Make one and store it
+        console.log("Saving keypair for " + name)
+        auth_key_pair = await generateECDSAKeyPair()
+        fs.writeFileSync(name, await export_private_key(auth_key_pair))
+        fs.writeFileSync(name + ".pub", await default_key_export(auth_key_pair))
+    }
 }
+
 const signalling_hostname = process.env.SIGNALLING_HOSTNAME || "localhost:8443"
 console.log(`Starting host with key ${shorten_key(await default_key_export(auth_key_pair))}`)
 host({auth_key_pair, signalling_hostname: signalling_hostname})

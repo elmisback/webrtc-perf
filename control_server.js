@@ -101,6 +101,15 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
     console.log(confirmed)
     if (Object.values(confirmed).filter(v => v == N_PEERS - 1).length == N_PEERS) {
       console.log('Overlay network established!')
+        for (let peer_id in dcs) {
+            send(dcs[peer_id], {command: {broadcast: true}})
+        }
+        setTimeout(() => {
+            console.log("Ending broadcast")
+            for (let peer_id in dcs) {
+                send(dcs[peer_id], {command: {end_broadcast: true}})
+            }
+        }, 5 * 1000)
     }
     return
   }

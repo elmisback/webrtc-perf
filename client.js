@@ -57,9 +57,11 @@ const handle_signaling_message = (({ data }) => {
             dcs[peer_id] = old_dcs[peer_id]
             if (dcs[peer_id]) return;
             pc.ondatachannel = ({ channel }) => channel.onmessage = ({ data }) => {
-                //console.log("Got data from peer", peer_id, data)
+                console.log("Got data from peer", shorten_key(peer_id), data)
                 const { command } = JSON.parse(data)
-                if (command) handle_command(command, peer_id)
+                if (command) {
+                    handle_command(command, peer_id)
+                }
             }
             const dc = pc.createDataChannel("mesh")
             dcs[peer_id] = dc
@@ -70,12 +72,13 @@ const handle_signaling_message = (({ data }) => {
     }
 })
 
-const output_log = []
-
+let output_log = []
+let broadcast_interval
+let broadcast_counter = 0
 let outputs = []
 let my_call_id
 
-function handle_command({ test, report, call_id, from, to, type = "data" }, controller_id) {
+function handle_command({ test, report, broadcast, end_broadcast, call_id, from, to, type = "data" }, controller_id) {
     if (test) {
         outputs.map(dc => send(dc, { from: overlay_id, last: overlay_id, id: Math.random(), hops: 0, test: true, call_id: my_call_id}))
         return
@@ -84,6 +87,23 @@ function handle_command({ test, report, call_id, from, to, type = "data" }, cont
         dcs[controller_id].send(JSON.stringify({ report: { overlay_id } }))
         return;
     }
+    if (broadcast) {
+        output_log = []
+        console.log("Broadcast started")
+        broadcast_interval = setInterval(() => {
+            broadcast_counter += 1
+            outputs.map(dc => send(dc, { from: overlay_id, last: overlay_id, id: [Date.now(), Math.random(), Math.random(), Math.random(), Math.random(), Math.random()], hops: 0, call_id: my_call_id}))
+        }, 1000 / 120)
+        return;
+    }
+    if (end_broadcast) {
+        console.log("Broadcast ended")
+        clearInterval(broadcast_interval)
+        // This is a big buffer. Avoid console.log truncation with direct stdout
+        process.stdout.write(JSON.stringify(output_log) + '\n');
+        return;
+    }
+
     const receive = to.includes("self")
     to = to.filter(s => s != "self")
     const output_channels = to.map(to_peer_id => pcs[to_peer_id].createDataChannel(`${call_id}-${to_peer_id}`))
@@ -98,7 +118,7 @@ function handle_command({ test, report, call_id, from, to, type = "data" }, cont
             old_ondatachannel({ channel });
             if (channel.label == `${call_id}-${client_id}`) {
                 channel.onmessage = ({ data }) => {
-                    console.log("here", data)
+                    //console.log("here", data)
                     const temp = JSON.parse(data)
                     output_channels.map(dc => send(dc, {...temp, last: overlay_id, hops: temp.hops+1, call_id}))
                     if (receive) { // NOTE this will try parsing all the data received...

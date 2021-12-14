@@ -8,9 +8,9 @@ import {
     default_encryption_key_import,
     default_key_export,
     default_sign,
-    default_verify, export_private_key,
+    default_verify,
     generateECDHKeyPair,
-    generateECDSAKeyPair, import_private_key, import_public_key, shorten_key
+    get_persisted_keypair, shorten_key
 } from "./auth.js";
 import parseArgs from "minimist";
 import * as fs from "fs";
@@ -258,23 +258,10 @@ let host = async ({
     }
 }
 
-const name = process.env.NAME || null
+const name = args["key"]
 let auth_key_pair
 if (name) {
-    try {
-        let private_key = fs.readFileSync(name)
-        private_key = await import_private_key(private_key)
-        let public_key = fs.readFileSync(name + ".pub")
-        public_key = await import_public_key(public_key)
-
-        auth_key_pair = {publicKey: public_key, privateKey: private_key}
-    } catch {
-        // No keypair on disk for this name yet. Make one and store it
-        console.log("Saving keypair for " + name)
-        auth_key_pair = await generateECDSAKeyPair()
-        fs.writeFileSync(name, await export_private_key(auth_key_pair))
-        fs.writeFileSync(name + ".pub", await default_key_export(auth_key_pair))
-    }
+    auth_key_pair = await get_persisted_keypair(name)
 }
 
 const signalling_hostname = process.env.SIGNALLING_HOSTNAME || "localhost:8443"

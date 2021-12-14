@@ -1,4 +1,5 @@
 import {
+    get_persisted_keypair,
 
     shorten_key
 } from "./auth.js";
@@ -16,10 +17,15 @@ let dcs = ({})
 let client_id
 
 let host_public_key = fs.readFileSync(args["host-key"]).toString()
-
+let key_name = args['key']
 
 const signalling_hostname = process.env.SIGNALLING_HOSTNAME || "localhost:8443"
 console.log(`Connecting to host with key ${shorten_key(host_public_key)}`)
+let auth_key_pair
+// Provide a key name if you want client IDs to be fixed for debugging purposes
+if (key_name) {
+    auth_key_pair = await get_persisted_keypair(key_name)
+}
 let channel = await connectToHost({host: host_public_key, signalling_hostname: signalling_hostname})
 
 channel.onmessage = (({ data }) => {
@@ -54,7 +60,7 @@ channel.onmessage = (({ data }) => {
           dcs[peer_id] = old_dcs[peer_id]
           if (dcs[peer_id]) return;
           pc.ondatachannel = ({ channel }) => channel.onmessage = ({ data }) => {
-              console.log("Got data from peer", peer_id, data)
+              console.log("Got data from peer", shorten_key(peer_id), data)
               const {report} = JSON.parse(data)
             if (report) handle_report({ ...report, client_id: peer_id })
           }

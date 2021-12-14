@@ -1,4 +1,5 @@
 import {webcrypto as crypto} from "crypto";
+import fs from "fs";
 
 const ECDSA_HASH = "SHA-256"
 const ECDSA_CURVE = "P-384"
@@ -143,4 +144,23 @@ let deriveSecretKey = (privateKey, publicKey) => crypto.subtle.deriveKey(
 
 export let shorten_key = (key_string) => {
     return key_string.substr(32,8)
+}
+
+export let get_persisted_keypair = async (name) => {
+    let auth_key_pair
+    try {
+        let private_key = fs.readFileSync(name)
+        private_key = await import_private_key(private_key)
+        let public_key = fs.readFileSync(name + ".pub")
+        public_key = await import_public_key(public_key)
+
+        auth_key_pair = {publicKey: public_key, privateKey: private_key}
+    } catch {
+        // No keypair on disk for this name yet. Make one and store it
+        console.log("Saving keypair for " + name)
+        auth_key_pair = await generateECDSAKeyPair()
+        fs.writeFileSync(name, await export_private_key(auth_key_pair))
+        fs.writeFileSync(name + ".pub", await default_key_export(auth_key_pair))
+    }
+    return auth_key_pair
 }

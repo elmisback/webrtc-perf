@@ -1,4 +1,7 @@
-import {shorten_key} from "./auth.js";
+import {
+    get_persisted_keypair,
+    shorten_key
+} from "./auth.js";
 import parseArgs from "minimist";
 import * as fs from "fs";
 import {fileURLToPath} from "url";
@@ -15,6 +18,7 @@ let pcs = ({})
 let dcs = ({})
 let client_id
 let overlay_id = args['id']
+let key_name = args['key']
 if (MAIN && !overlay_id) throw new Error('Please supply an overlay --id for this process')
 
 let host_public_key = fs.readFileSync(args["host-key"]).toString()
@@ -116,7 +120,13 @@ let channel
 if (MAIN) {
     const signalling_hostname = process.env.SIGNALLING_HOSTNAME || "localhost:8443"
     console.log(`Connecting to host with key ${shorten_key(host_public_key)}`)
-    channel = await connectToHost({ host: host_public_key, signalling_hostname: signalling_hostname })
+    let auth_key_pair
+    // Provide a key name if you want client IDs to be fixed for debugging purposes
+    if (key_name) {
+        auth_key_pair = await get_persisted_keypair(key_name)
+    }
+
+    channel = await connectToHost({ host: host_public_key, auth_key_pair: auth_key_pair, signalling_hostname: signalling_hostname })
     channel.onmessage = handle_signaling_message
 
     await channel.send(JSON.stringify({ action: 'join', channel: 'test' }))

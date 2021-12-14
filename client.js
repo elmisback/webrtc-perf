@@ -92,7 +92,13 @@ function handle_command({ test, report, broadcast, end_broadcast, call_id, from,
         console.log("Broadcast started")
         broadcast_interval = setInterval(() => {
             broadcast_counter += 1
-            outputs.map(dc => send(dc, { from: overlay_id, last: overlay_id, id: [Date.now(), Math.random(), Math.random(), Math.random(), Math.random(), Math.random()], hops: 0, call_id: my_call_id}))
+            const data = new Array(64)
+            for (let i = 0; i < 64; i++) {
+                data[i] = Math.random()
+            }
+            data[0] = Date.now()
+            data[1] = broadcast_counter
+            outputs.map(dc => send(dc, { from: overlay_id, last: overlay_id, id: data, hops: 0, call_id: my_call_id}))
         }, 1000 / 120)
         return;
     }

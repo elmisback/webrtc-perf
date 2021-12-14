@@ -18,10 +18,7 @@ parser.add_argument('--bw-host', '-B',
                     help="Bandwidth of host links (Mb/s)",
                     default=1000)
 
-parser.add_argument('--bw-net', '-b',
-                    type=float,
-                    help="Bandwidth of bottleneck (network) link (Mb/s)",
-                    required=True)
+
 
 parser.add_argument('--delay',
                     type=float,
@@ -56,13 +53,17 @@ if args.dir:
     args.dir = os.path.realpath(args.dir)
 
 physical_links = {
-    "lookup": {"up": 200, "down": 200},
+    "h0": {"up": 200, "down": 200},
     "h1": {"up": 10, "down": 100},
     "h2": {"up": 3, "down": 10},
     "h3": {"up": 8, "down": 20},
     "h4": {"up": 8, "down": 20},
     "h5": {"up": 8, "down": 20},
+    "h6": {"up": 8, "down": 20},
+    "h7": {"up": 8, "down": 20},
 }
+
+roles = {"h0": "lookup", "h1": "host", "h7": "control"}
 
 
 class AsymTCLink(TCLink):
@@ -113,20 +114,32 @@ def start_lookup_server(net, name):
     sleep(1)
     return [proc]
 
+def env_hostname(net ,lookup_hostname):
+    return f"SIGNALLING_HOSTNAME={net.get(lookup_hostname).IP()}:8443"
 
-def start_host(net, name):
+def logging_args(dir, name):
+    return f"> {dir}/{name}_log.txt 2> {dir}/{name}_err_log.txt"
+
+def start_host(net, name, lookup):
     host = net.get(name)
     proc = host.popen(
-        f"SIGNALLING_HOSTNAME={net.get('lookup').IP()}:8443 NAME={name} node host.js > {args.dir}/{name}_log.txt",
+        f"{env_hostname(net, lookup)} node host.js --key {name} {logging_args(args.dir, name)} t",
         shell=True)
     sleep(1)
     return [proc]
 
-
-def start_client(net, name):
+def start_control_server(net, name, lookup, party_host):
     host = net.get(name)
     proc = host.popen(
-        f"SIGNALLING_HOSTNAME={net.get('lookup').IP()}:8443 NAME={name} node client.js  --host-key h1.pub > {args.dir}/{name}_log.txt",
+        f"{env_hostname(net, lookup)} node control_server.js --key {name} --host-key {party_host}.pub {logging_args(args.dir, name)}",
+        shell=True)
+    sleep(1)
+    return [proc]
+
+def start_client(net, name, lookup, party_host):
+    host = net.get(name)
+    proc = host.popen(
+        f"{env_hostname(net, lookup)} node client.js --key {name} --id {name} --host-key {party_host}.pub {logging_args(args.dir, name)} ",
         shell=True)
     sleep(1)
     return [proc]
@@ -144,16 +157,26 @@ def measure_perf():
     # This performs a basic all pairs ping test.
     net.pingAll()
 
-    start_lookup_server(net, "lookup")
-
-    start_host(net, "h1")
-
+    # We expect one of each of these roles
+    party_host = None
+    lookup_host = None
     for key in physical_links.keys():
-        if key in ["lookup", "h1"]:
-            continue
-        start_client(net, key)
+        role = roles.get(key, "client")
+        if role == "client":
+            start_client(net, key, lookup_host, party_host)
+        elif role == "host":
+            party_host = key
+            start_host(net, key, lookup_host)
+        elif role == "lookup":
+            lookup_host = key
+            start_lookup_server(net, key)
+        elif role == "control":
+            start_control_server(net, key,  lookup_host, party_host)
+        else:
+            raise RuntimeError("No role for " + key)
+    print("Processes started. Letting things run...")
     sleep(10)
-
+    print("Done. Shutting down.")
     net.stop()
     # Ensure that all processes you create within Mininet are killed.
     # Sometimes they require manual killing.

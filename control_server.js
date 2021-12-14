@@ -1,6 +1,5 @@
 import {
     get_persisted_keypair,
-
     shorten_key
 } from "./auth.js";
 
@@ -17,16 +16,16 @@ let dcs = ({})
 let client_id
 
 let host_public_key = fs.readFileSync(args["host-key"]).toString()
-let key_name = args['key']
 
 const signalling_hostname = process.env.SIGNALLING_HOSTNAME || "localhost:8443"
 console.log(`Connecting to host with key ${shorten_key(host_public_key)}`)
+let key_name = args['key']
 let auth_key_pair
 // Provide a key name if you want client IDs to be fixed for debugging purposes
 if (key_name) {
     auth_key_pair = await get_persisted_keypair(key_name)
 }
-let channel = await connectToHost({host: host_public_key, signalling_hostname: signalling_hostname})
+let channel = await connectToHost({host: host_public_key, auth_key_pair: auth_key_pair, signalling_hostname: signalling_hostname})
 
 channel.onmessage = (({ data }) => {
   // handle signalling messages here
@@ -88,7 +87,7 @@ const translation_table = ({})
 const simple_chain_from_index = (i, n) => ([...new Array(n)].map((_, j) => (((j + i) - 1) % n) + 1).reverse().reduce((acc, e, i) => ({ ...i >= n - 2 ? {} : {self: true}, [e]: acc}), {self: true}))
 
 const handle_report = async ({ client_id, overlay_id, from }) => {
-  console.log('handling report', client_id, overlay_id, from)
+  console.log('handling report', shorten_key(client_id), overlay_id, from)
   if (from) {
     confirmed[from] = (confirmed[from] || 0) + 1
     console.log(confirmed)

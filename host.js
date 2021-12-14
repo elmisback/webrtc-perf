@@ -88,7 +88,7 @@ let set_heartbeat_timeout = (ms=3000) => {
         let updated_sessions = ({})
         // remove clients that have died
         Object.keys(no_ping).map(client_id => {
-            console.log('Dropping', client_id)
+            console.log('Dropping', shorten_key(client_id))
             delete server_connections[client_id]
             Object.keys(sessions).map(s => {
                 updated_sessions[s] = true

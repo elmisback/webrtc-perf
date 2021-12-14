@@ -175,16 +175,7 @@ let host = async ({
             const host_encryption_key_pair = await generate_encryption_key_pair()
             const signed_encryption_key = await sign(await encryption_key_export(host_encryption_key_pair))
             const peer_connection = new RTCPeerConnection({
-                iceServers: /*[
-          { urls: 'stun:stun.stunprotocol.org:3478' },
-          { urls: 'stun:stun.l.google.com:19302' },
-          // using more than 2 STUN/TURN servers slows discovery: https://stackoverflow.com/questions/58223805/why-does-using-more-than-two-stun-turn-servers-slow-down-discovery
-          //{urls: 'stun:stun1.l.google.com:19302'}
-          // 'stun:stun2.l.google.com:19302',
-          // 'stun:stun3.l.google.com:19302',
-          // 'stun:stun4.l.google.com:19302'  // Firefox complains about more than 5 STUN servers
-          // https://numb.viagenie.ca/ hosts a free TURN server apparently?
-        ]*/
+                iceServers:
                     [{
                         urls: ['stun:stun.l.google.com:19302', 'stun:stun.stunprotocol.org']
                     }]

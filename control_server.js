@@ -86,6 +86,14 @@ const translation_table = ({})
 //
 const simple_chain_from_index = (i, n) => ([...new Array(n)].map((_, j) => (((j + i) - 1) % n) + 1).reverse().reduce((acc, e, i) => ({ ...i >= n - 2 ? {} : {self: true}, [e]: acc}), {self: true}))
 
+// HAX: Needed to give non-number overlay names to play nice with key files etc
+const prefix_names = (old_name) => {
+    if (old_name === "self"){
+        return old_name;
+    }
+    else return "c" + old_name
+}
+
 const handle_report = async ({ client_id, overlay_id, from }) => {
   console.log('handling report', shorten_key(client_id), overlay_id, from)
   if (from) {
@@ -115,7 +123,7 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
   const T = { ...translation_table, self: "self" }
   console.log('translation_table', T)
   console.log("messages", messages)
-  const translated = messages.map(({ from, through, to, call_id}) => ({ call_id, through: T[through], from: T[from], to: to.map(s => T[s]) }))
+  const translated = messages.map(({ from, through, to, call_id}) => ({ call_id, through: T[prefix_names(through)], from: T[prefix_names(from)], to: to.map(s => T[prefix_names(s)]) }))
   //console.log(translated)
   translated.map(m => send(dcs[m.through], { command: m }))
   

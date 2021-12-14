@@ -55,11 +55,11 @@ if args.dir:
 physical_links = {
     "h0": {"up": 200, "down": 200},
     "h1": {"up": 10, "down": 100},
-    "h2": {"up": 3, "down": 10},
-    "h3": {"up": 8, "down": 20},
-    "h4": {"up": 8, "down": 20},
-    "h5": {"up": 8, "down": 20},
-    "h6": {"up": 8, "down": 20},
+    "c1": {"up": 3, "down": 10},
+    "c2": {"up": 8, "down": 20},
+    "c3": {"up": 8, "down": 20},
+    "c4": {"up": 8, "down": 20},
+    "c5": {"up": 8, "down": 20},
     "h7": {"up": 8, "down": 20},
 }
 
@@ -123,7 +123,7 @@ def logging_args(dir, name):
 def start_host(net, name, lookup):
     host = net.get(name)
     proc = host.popen(
-        f"{env_hostname(net, lookup)} node host.js --key {name} {logging_args(args.dir, name)} t",
+        f"{env_hostname(net, lookup)} node host.js --key keys/{name} {logging_args(args.dir, name)} t",
         shell=True)
     sleep(1)
     return [proc]
@@ -131,7 +131,7 @@ def start_host(net, name, lookup):
 def start_control_server(net, name, lookup, party_host):
     host = net.get(name)
     proc = host.popen(
-        f"{env_hostname(net, lookup)} node control_server.js --key {name} --host-key {party_host}.pub {logging_args(args.dir, name)}",
+        f"{env_hostname(net, lookup)} node control_server.js --key keys/{name} --host-key keys/{party_host}.pub {logging_args(args.dir, name)}",
         shell=True)
     sleep(1)
     return [proc]
@@ -139,7 +139,7 @@ def start_control_server(net, name, lookup, party_host):
 def start_client(net, name, lookup, party_host):
     host = net.get(name)
     proc = host.popen(
-        f"{env_hostname(net, lookup)} node client.js --key {name} --id {name} --host-key {party_host}.pub {logging_args(args.dir, name)} ",
+        f"{env_hostname(net, lookup)} node client.js --key keys/{name} --id {name} --host-key keys/{party_host}.pub {logging_args(args.dir, name)} ",
         shell=True)
     sleep(1)
     return [proc]
@@ -155,7 +155,7 @@ def measure_perf():
     # links.
     dumpNodeConnections(net.hosts)
     # This performs a basic all pairs ping test.
-    net.pingAll()
+    # net.pingAll()
 
     # We expect one of each of these roles
     party_host = None

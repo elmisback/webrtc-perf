@@ -170,8 +170,4 @@ function traverse (t, f, parent=undefined) {  /* f : tree * 'a -> list of 'b */
   return [...f(t, parent), ...Object.entries(t).map(([k,v]) => traverse(v, f, k)).flat()]
 }
 
-//const get_links = tree => traverse(tree, (t, _) => Object.keys(t).map(k => k != 'self' && Object.keys(t[k]).map(k1 => k1 != 'self' && [k, k1]))).flat().filter(e => e)
-
 const get_messages = tree => traverse(tree, (t, parent) => [[t, parent]]).map(([t, parent]) => Object.entries(t).map(([k, v]) => k == "self" ? false : ({from: parent, through:k, to: Object.keys(v)}))).flat().filter(e => e)
-
-// messages.map(({from, through, to}, i) => dcs[translation[through]].send(JSON.stringify({call_id: i, from: translation[from], to: to.map(s => translation[s])})))

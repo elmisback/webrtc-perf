@@ -9,7 +9,7 @@ import {connectToHost, get_peer_connection} from "./communication.js";
 
 
 const MAIN = process.argv[1] === fileURLToPath(import.meta.url)
-
+const BROADCAST_FREQUENCY = 60
 const args = parseArgs(process.argv.slice(2))
 
 let message_handlers = ({})
@@ -99,7 +99,7 @@ function handle_command({ test, report, broadcast, end_broadcast, call_id, from,
             data[0] = Date.now()
             data[1] = broadcast_counter
             outputs.map(dc => send(dc, { from: overlay_id, last: overlay_id, id: data, hops: 0, call_id: my_call_id}))
-        }, 1000 / 120)
+        }, 1000 / BROADCAST_FREQUENCY)
         return;
     }
     if (end_broadcast) {

@@ -38,7 +38,7 @@ channel.onmessage = (({ data }) => {
   if (data.action == 'list') {
       // data = {client_id: "my_id", response: ["peer_id1", "peer_id2"]}
       // update the peer mesh with these peers
-      console.log('Got list command', data)
+      //console.log('Got list command', data)
       client_id = data.client_id
       peers = data.response.filter(p => p != data.client_id)
       const old_pcs = pcs
@@ -76,10 +76,10 @@ channel.onmessage = (({ data }) => {
 // makes a simple chain call on a list of peers of length n
 // starts from peer i, broadcasts to all other peers along the chain
 // 1-indexed
-// >>> simple_chain_from_index(3, 5)
+// >>> N_chain_from_index(5, 3)
 // {"3":{"4":{"5":{"1":{"2":{"self":true},"self":true},"self":true},"self":true}}}
 //
-const simple_chain_from_index = (i, n) => ([...new Array(n)].map((_, j) => (((j + i) - 1) % n) + 1).reverse().reduce((acc, e, i) => ({ ...i >= n - 2 ? {} : {self: true}, [e]: acc}), {self: true}))
+const N_chain_from_index = (n, i) => ([...new Array(n)].map((_, j) => (((j + i) - 1) % n) + 1).reverse().reduce((acc, e, i) => ({ ...i >= n - 2 ? {} : {self: true}, [e]: acc}), {self: true}))
 
 // Function for building a tree based on node names and an accumulated value (parent_prop). post postprocesses the values (but not the root).
 function build_tree (root, get_children, get_parent_prop=e => null, parent_prop, post) { return {[root]: post(get_children(root, parent_prop).map(k => build_tree(k, get_children, get_parent_prop, get_parent_prop(root, k, parent_prop), post)).reduce((acc, t) => ({...acc, ...t}), {})) } }
@@ -91,6 +91,13 @@ const powers_of_2_up_to_n = n => {
 
 function kmap (f, o) { return typeof o == 'object' ? Object.entries(o).reduce((acc, [k, v]) => ({...acc, [f(k)]: kmap(f, v)}), {}) : o}
 
+const build_broadcast_tree = (root, get_children, get_parent_prop = e => null, parent_prop) => {
+  const o = build_tree(root, get_children, get_parent_prop = e => null, parent_prop, e => ({ ...e, self: true }))
+  delete o.self
+  delete o[root].self
+  return o
+}
+
 const N_chord_from_index = (N, idx) => {
   const o = build_tree(0, (n, p) => powers_of_2_up_to_n(N).filter(v => v < p).map(v => v + n).filter(v => v < N), (root, k, p) => k - root < 0 ? (k + N) - root : k - root, N, e => ({ ...e, self: true }))
   delete o.self
@@ -98,12 +105,25 @@ const N_chord_from_index = (N, idx) => {
   return kmap(i => i == 'self' ? 'self' : (parseInt(i) + idx - 1) % N + 1, o)
 }
 
-const N_PEERS = 5
+
 let INITED = false
-const ALL_TO_ALL_CHAINS = [...new Array(N_PEERS)].map((_, i) => ({ call_id: i, call: simple_chain_from_index(i + 1, N_PEERS) }))
-const ONE_TO_ALL_CHAIN = [{ call_id: 0, call: simple_chain_from_index(1, N_PEERS) }]
-const ONE_TO_ALL_TREE = [{ call_id: 0, call: N_chord_from_index(5, 1) }]
-const CALLS = ONE_TO_ALL_TREE
+const EXAMPLE_N = 5
+const ALL_TO_ALL_CHAINS = [...new Array(EXAMPLE_N)].map((_, i) => ({ call_id: i, call: N_chain_from_index(i + EXAMPLE_N, 1) }))
+const ONE_TO_ALL_CHAIN = [{ call_id: 0, call: N_chain_from_index(EXAMPLE_N, 1) }]
+const ONE_TO_ALL_TREE = [{ call_id: 0, call: N_chord_from_index(EXAMPLE_N, 1) }]
+const NONTRIV1 = [
+  build_broadcast_tree(1, root => ({ 1: [4], 4: [2, 3, 5, 7], 5: [6], 7: [8] })[root] || []),
+  build_broadcast_tree(2, root => ({ 2: [4], 4: [1, 3, 5, 7], 5: [6], 7: [8] })[root] || []),
+  build_broadcast_tree(3, root => ({ 3: [4], 4: [1, 2, 5, 7], 5: [6], 7: [8] })[root] || [])
+].map((t, i) => ({ call_id: i, call: t }))
+const NONTRIV2 = [
+  build_broadcast_tree(1, root => ({ 1: [2, 3, 4], 4: [5, 7], 5: [6], 7: [8] })[root] || []),
+  build_broadcast_tree(2, root => ({ 2: [1, 3, 4], 4: [5, 7], 5: [6], 7: [8] })[root] || []),
+  build_broadcast_tree(3, root => ({ 3: [1, 2, 4], 4: [5, 7], 5: [6], 7: [8] })[root] || [])
+].map((t, i) => ({ call_id: i, call: t }))
+const uniq = A => [...new Set(A)]
+const CALLS = NONTRIV2
+const N_PEERS = uniq(traverse(CALLS[0], t => Object.keys(t)).flat()).filter(e => !['self', 'call_id', 'call'].includes(e)).length
 let confirmed = {}
 const translation_table = ({})
 
@@ -143,23 +163,11 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
           }
       }, 5 * 1000)
     }
-    // else if (CALLS.length == 1 && one_connected_to_all) {
-    //   console.log('One-to-all overlay network established!')
-    //   const [[overlay_id, _]] = Object.entries(confirmed).filter(([k, v]) => v == N_PEERS - 1)
-    //   const caller_id = translation_table[prefix_names(overlay_id)]
-    //   send(dcs[caller_id], { command: { broadcast: true } })
-    //   setTimeout(() => {
-    //     console.log("Ending broadcast")
-    //     //send(dcs[caller_id], { command: { end_broadcast: true } })
-    //     for (let peer_id in dcs) {
-    //       send(dcs[peer_id], {command: {end_broadcast: true}})
-    //     }
-    //   }, 5 * 1000)
-    // }
     return
   }
   translation_table[prefix_names(overlay_id)] = client_id
   const overlay_ids = Object.keys(translation_table)
+  console.log(overlay_ids.length, 'have arrived out of', N_PEERS)
   if (overlay_ids.length < N_PEERS || INITED) return;
   // all peers have arrived, we can now start managing the overlay network
 

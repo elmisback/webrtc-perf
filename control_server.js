@@ -73,14 +73,6 @@ channel.onmessage = (({ data }) => {
   }
 })
 
-const N_PEERS = 5
-let INITED = false
-const ALL2ALL = 'all2all'
-const ONE2ALL = 'one2all'
-const MODE = ALL2ALL
-let confirmed = {}
-const translation_table = ({})
-
 // makes a simple chain call on a list of peers of length n
 // starts from peer i, broadcasts to all other peers along the chain
 // 1-indexed
@@ -88,6 +80,16 @@ const translation_table = ({})
 // {"3":{"4":{"5":{"1":{"2":{"self":true},"self":true},"self":true},"self":true}}}
 //
 const simple_chain_from_index = (i, n) => ([...new Array(n)].map((_, j) => (((j + i) - 1) % n) + 1).reverse().reduce((acc, e, i) => ({ ...i >= n - 2 ? {} : {self: true}, [e]: acc}), {self: true}))
+
+const N_PEERS = 5
+let INITED = false
+const ALL2ALL = 'all2all'
+const ONE2ALL = 'one2all'
+const MODE = ALL2ALL
+const ALL_TO_ALL_CHAINS = [...new Array(N_PEERS)].map((_, i) => ({ call_id: i, call: simple_chain_from_index(i + 1, N_PEERS) }))
+const CALLS = ALL_TO_ALL_CHAINS
+let confirmed = {}
+const translation_table = ({})
 
 // HAX: Needed to give non-number overlay names to play nice with key files etc
 const prefix_names = (old_name) => {
@@ -134,9 +136,9 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
   // all peers have arrived, we can now start managing the overlay network
 
   // set of each-to-all chains:
-  const chains = [...new Array(N_PEERS)].map((_, i) => ({ call_id: i, call: simple_chain_from_index(i + 1, N_PEERS) }))
+  
 
-  const messages = chains.flatMap(({ call_id, call }) => get_messages(call).map(m => ({ call_id, ...m }))).reverse()  // HACK reverse to make sure datachannel handlers get init'd before datachannels? 
+  const messages = CALLS.flatMap(({ call_id, call }) => get_messages(call).map(m => ({ call_id, ...m }))).reverse()  // HACK reverse to make sure datachannel handlers get init'd before datachannels? 
   /*
     for a connection like A -> B -> C and D
     the message to B looks like 

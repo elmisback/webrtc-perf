@@ -105,12 +105,14 @@ const N_chord_from_index = (N, idx) => {
   return kmap(i => i == 'self' ? 'self' : (parseInt(i) + idx - 1) % N + 1, o)
 }
 
+// Configuration ////////////////////////////
+const EXAMPLE_N = 5  // USAGE modify to set number of peers in most examples
 
-let INITED = false
-const EXAMPLE_N = 5
+// Network configurations below here
 const ALL_TO_ALL_CHAINS = [...new Array(EXAMPLE_N)].map((_, i) => ({ call_id: i, call: N_chain_from_index(i + EXAMPLE_N, 1) }))
 const ONE_TO_ALL_CHAIN = [{ call_id: 0, call: N_chain_from_index(EXAMPLE_N, 1) }]
 const ONE_TO_ALL_TREE = [{ call_id: 0, call: N_chord_from_index(EXAMPLE_N, 1) }]
+const ONE_TO_ALL_MESH = [{ call_id: 0, call: { 1: [...new Array(EXAMPLE_N - 1)].reduce((acc, _, i) => ({ ...acc, [i + 2]: { self: true } }), {}) } }]
 const NONTRIV1 = [
   build_broadcast_tree(1, root => ({ 1: [4], 4: [2, 3, 5, 7], 5: [6], 7: [8] })[root] || []),
   build_broadcast_tree(2, root => ({ 2: [4], 4: [1, 3, 5, 7], 5: [6], 7: [8] })[root] || []),
@@ -121,10 +123,15 @@ const NONTRIV2 = [
   build_broadcast_tree(2, root => ({ 2: [1, 3, 4], 4: [5, 7], 5: [6], 7: [8] })[root] || []),
   build_broadcast_tree(3, root => ({ 3: [1, 2, 4], 4: [5, 7], 5: [6], 7: [8] })[root] || [])
 ].map((t, i) => ({ call_id: i, call: t }))
+
+
+const CALLS = ONE_TO_ALL_MESH   // USAGE set the example to run here
+
+// End Configuration ////////////////////////////
+
+// Globals
+let INITED = false
 const uniq = A => [...new Set(A)]
-
-const CALLS = NONTRIV2   // USAGE set the example to run here
-
 const N_PEERS = uniq(traverse(CALLS[0], t => Object.keys(t)).flat()).filter(e => !['self', 'call_id', 'call'].includes(e)).length
 let confirmed = {}
 const translation_table = ({})

@@ -5,6 +5,8 @@ from argparse import ArgumentParser
 from matplotlib import pyplot as plt
 import json
 import pandas as pd
+import seaborn as sns
+sns.set_theme(style="whitegrid")
 
 parser = ArgumentParser(description="tests")
 parser.add_argument('--files', '-f',
@@ -30,9 +32,24 @@ def make_plots():
             as_rows.append((packet["id"][0], entry["time"], packet["hops"], packet["id"][1], packet["from"], to))
 
     data = pd.DataFrame(as_rows, columns=columns)
-    data["TripTime"] = data["Received"] - data["Sent"]
-    # TODO: plot delay, loss over time
+    data["TripTime"] = (data["Received"] - data["Sent"]) / 1000.
+    earliest_stamp = data["Sent"].min()
+    data["Sent"] -= earliest_stamp
+    data["Received"] -= earliest_stamp
+    data["SentTime"] = data["Sent"].astype(float) / 1000.
+    last_received_by_pair = data.groupby(["From", "To"])["Seq"].max()
+    print(last_received_by_pair)
 
+    g = sns.FacetGrid(data, col="From", col_order=["c1", "c2", "c3", "c4", "c5"])
+    g.map_dataframe(sns.lineplot, x="SentTime", y="TripTime", hue="To")
+    g.add_legend()
+    plt.show()
+
+    # Consistency check: Are we sending data on time, or is the process getting bogged down and missing sends?
+    g = sns.FacetGrid(data, col="From", col_order=["c1", "c2", "c3", "c4", "c5"])
+    g.map_dataframe(sns.lineplot, x="Seq", y="SentTime", hue="To")
+    g.add_legend()
+    plt.show()
 
 
 if __name__ == "__main__":

@@ -87,6 +87,7 @@ const ALL2ALL = 'all2all'
 const ONE2ALL = 'one2all'
 const MODE = ALL2ALL
 const ALL_TO_ALL_CHAINS = [...new Array(N_PEERS)].map((_, i) => ({ call_id: i, call: simple_chain_from_index(i + 1, N_PEERS) }))
+const ONE_TO_ALL_CHAIN = [simple_chain_from_index(1, N_PEERS)]
 const CALLS = ALL_TO_ALL_CHAINS
 let confirmed = {}
 const translation_table = ({})
@@ -108,7 +109,7 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
     console.log(confirmed)
     const all_connected_to_all = Object.values(confirmed).filter(v => v == N_PEERS - 1).length == N_PEERS
     const one_connected_to_all = Object.values(confirmed).filter(v => v == N_PEERS - 1).length == 1
-    if (MODE == ALL2ALL && all_connected_to_all) {
+    if (CALLS.length > 1 && all_connected_to_all) {
       console.log('All-to-all overlay network established!')
       for (let peer_id in dcs) {
           send(dcs[peer_id], {command: {broadcast: true}})
@@ -119,7 +120,7 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
               send(dcs[peer_id], {command: {end_broadcast: true}})
           }
       }, 5 * 1000)
-    } else if (MODE == ONE2ALL && one_connected_to_all) {
+    } else if (CALLS.length == 1 && one_connected_to_all) {
       console.log('One-to-all overlay network established!')
       const [[peer_id, _]] = Object.entries(confirmed).filter(([k, v]) => v == N_PEERS - 1)
       send(dcs[peer_id], { command: { broadcast: true } })
@@ -130,7 +131,7 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
     }
     return
   }
-  translation_table[overlay_id] = client_id
+  translation_table[prefix_names(overlay_id)] = client_id
   const overlay_ids = Object.keys(translation_table)
   if (overlay_ids.length < N_PEERS || INITED) return;
   // all peers have arrived, we can now start managing the overlay network
@@ -150,7 +151,7 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
   console.log('translation_table', T)
   console.log("messages", messages)
   const translated = messages.map(({ from, through, to, call_id}) => ({ call_id, through: T[prefix_names(through)], from: T[prefix_names(from)], to: to.map(s => T[prefix_names(s)]) }))
-  //console.log(translated)
+  console.log(translated)
   translated.map(m => send(dcs[m.through], { command: m }))
   
   //await new Promise(resolve => setTimeout(() => resolve(), 5000))

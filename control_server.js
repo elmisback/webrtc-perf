@@ -109,7 +109,7 @@ const N_chord_from_index = (N, idx) => {
 const EXAMPLE_N = 5  // USAGE modify to set number of peers in most examples
 
 // Network configurations below here
-const ALL_TO_ALL_CHAINS = [...new Array(EXAMPLE_N)].map((_, i) => ({ call_id: i, call: N_chain_from_index(i + EXAMPLE_N, 1) }))
+const ALL_TO_ALL_CHAINS = [...new Array(EXAMPLE_N)].map((_, i) => ({ call_id: i, call: N_chain_from_index(EXAMPLE_N, i + 1) }))
 const ONE_TO_ALL_CHAIN = [{ call_id: 0, call: N_chain_from_index(EXAMPLE_N, 1) }]
 const ONE_TO_ALL_TREE = [{ call_id: 0, call: N_chord_from_index(EXAMPLE_N, 1) }]
 const ONE_TO_ALL_MESH = [{ call_id: 0, call: { 1: [...new Array(EXAMPLE_N - 1)].reduce((acc, _, i) => ({ ...acc, [i + 2]: { self: true } }), {}) } }]

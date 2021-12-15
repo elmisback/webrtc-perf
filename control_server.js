@@ -106,7 +106,7 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
     console.log(confirmed)
     const all_connected_to_all = Object.values(confirmed).filter(v => v == N_PEERS - 1).length == N_PEERS
     const one_connected_to_all = Object.values(confirmed).filter(v => v == N_PEERS - 1).length == 1
-    if ((MODE == ALL2ALL && all_connected_to_all) {
+    if (MODE == ALL2ALL && all_connected_to_all) {
       console.log('All-to-all overlay network established!')
       for (let peer_id in dcs) {
           send(dcs[peer_id], {command: {broadcast: true}})

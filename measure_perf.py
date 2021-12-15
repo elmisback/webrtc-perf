@@ -52,18 +52,47 @@ args = parser.parse_args()
 if args.dir:
     args.dir = os.path.realpath(args.dir)
 
-physical_links = {
-    "h0": {"up": 200, "down": 200},
-    "h1": {"up": 10, "down": 100},
-    "c1": {"up": 3, "down": 10},
-    "c2": {"up": 8, "down": 20},
-    "c3": {"up": 8, "down": 20},
-    "c4": {"up": 8, "down": 20},
-    "c5": {"up": 8, "down": 20},
-    "h7": {"up": 8, "down": 20},
+homogenous_links = {
+    "s1": {
+        "peers": {
+            "h0": {"up": 200, "down": 200},
+            "h1": {"up": 10, "down": 100},
+            "c1": {"up": 8, "down": 20},
+            "c2": {"up": 8, "down": 20},
+            "c3": {"up": 8, "down": 20},
+            "c4": {"up": 8, "down": 20},
+            "c5": {"up": 8, "down": 20},
+            "h7": {"up": 8, "down": 20},
+        },
+        "attributes":  {"up": 10, "down": 20}
+       }
 }
 
-roles = {"h0": "lookup", "h1": "host", "h7": "control"}
+mixed_lan_links = {
+    "s1": {
+        "peers" : {
+            "h0": {"up": 200, "down": 200},
+            "h1": {"up": 10, "down": 100},
+            "s2": {
+                "peers": {
+                    "c1": {"up": 100, "down": 100},
+                    "c2": {"up": 100, "down": 100},
+                    "c3": {"up": 100, "down": 100},
+                },
+                "attributes":  {"up": 20, "down": 20}
+            },
+            "c4": {"up": 40, "down": 40},
+            "c5": {"up": 8, "down": 20},
+            "c6": {"up": 8, "down": 20},
+            "c7": {"up": 8, "down": 20},
+            "c8": {"up": 8, "down": 20},
+            "h7": {"up": 8, "down": 20}
+            },
+        "attributes":  {"up": 10, "down": 20}
+    }
+}
+
+roles = {"lookup": "h0", "host": "h1", "control": "h7"}
 
 
 class AsymTCLink(TCLink):
@@ -98,15 +127,26 @@ class AsymTCLink(TCLink):
 
 class PerfTopo(Topo):
     def build(self, layout):
-        switch = self.addSwitch('s0')
-        for key, attributes in layout.items():
-            host = self.addHost(key)
+        def setup_layer(switch_name, layer, parent_switch):
+            switch = self.addSwitch(switch_name)
+            if parent_switch:
+                attributes = layer["attributes"]
+                self.addLink(switch,
+                             parent_switch, cls=AsymTCLink,
+                             params1={"bw": attributes["down"], "delay": '5ms', "max_queue_size": args.maxq},
+                             params2={"bw": attributes["up"], "delay": '5ms', "max_queue_size": args.maxq})
+            for key, value in layer["peers"].items():
+                if "up" not in value.keys():
+                    # This entry represents another switch
+                    setup_layer(key, value, switch)
+                    continue
+                host = self.addHost(key)
 
-            self.addLink(switch,
-                         host, cls=AsymTCLink,
-                         params1={"bw": attributes["down"], "delay": '5ms', "max_queue_size": args.maxq},
-                         params2={"bw": attributes["up"], "delay": '5ms', "max_queue_size": args.maxq})
-
+                self.addLink(switch,
+                             host, cls=AsymTCLink,
+                             params1={"bw": value["down"], "delay": '5ms', "max_queue_size": args.maxq},
+                             params2={"bw": value["up"], "delay": '5ms', "max_queue_size": args.maxq})
+        setup_layer("s1", layout["s1"], None)
 
 def start_lookup_server(net, name):
     host = net.get(name)
@@ -148,34 +188,38 @@ def start_client(net, name, lookup, party_host):
 def measure_perf():
     if not os.path.exists(args.dir):
         os.makedirs(args.dir)
-    topo = PerfTopo(physical_links)
+    topo = PerfTopo(mixed_lan_links)
     net = Mininet(topo=topo, host=CPULimitedHost, link=AsymTCLink, controller=OVSController)
     net.start()
     # This dumps the topology and how nodes are interconnected through
     # links.
     dumpNodeConnections(net.hosts)
     # This performs a basic all pairs ping test.
-    # net.pingAll()
+    net.pingAll()
 
     # We expect one of each of these roles
-    party_host = None
-    lookup_host = None
-    for key in physical_links.keys():
+
+
+    lookup_host = roles["lookup"]
+    start_lookup_server(net, lookup_host)
+    party_host = roles["host"]
+    start_host(net, party_host, lookup_host)
+    start_control_server(net, roles["control"], lookup_host, party_host)
+
+    for key in net.keys():
+        if key == "c0":
+            # Not sure how this gets in the network...
+            continue
+        if topo.isSwitch(key):
+            print("Skipping " + key)
+            continue
         role = roles.get(key, "client")
         if role == "client":
             start_client(net, key, lookup_host, party_host)
-        elif role == "host":
-            party_host = key
-            start_host(net, key, lookup_host)
-        elif role == "lookup":
-            lookup_host = key
-            start_lookup_server(net, key)
-        elif role == "control":
-            start_control_server(net, key,  lookup_host, party_host)
         else:
             raise RuntimeError("No role for " + key)
     print("Processes started. Letting things run...")
-    sleep(10)
+    sleep(25)
     print("Done. Shutting down.")
     net.stop()
     # Ensure that all processes you create within Mininet are killed.

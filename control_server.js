@@ -83,12 +83,9 @@ const simple_chain_from_index = (i, n) => ([...new Array(n)].map((_, j) => (((j 
 
 const N_PEERS = 5
 let INITED = false
-const ALL2ALL = 'all2all'
-const ONE2ALL = 'one2all'
-const MODE = ALL2ALL
 const ALL_TO_ALL_CHAINS = [...new Array(N_PEERS)].map((_, i) => ({ call_id: i, call: simple_chain_from_index(i + 1, N_PEERS) }))
-const ONE_TO_ALL_CHAIN = [simple_chain_from_index(1, N_PEERS)]
-const CALLS = ALL_TO_ALL_CHAINS
+const ONE_TO_ALL_CHAIN = [{ call_id: 0, call: simple_chain_from_index(1, N_PEERS) }]
+const CALLS = ONE_TO_ALL_CHAIN
 let confirmed = {}
 const translation_table = ({})
 
@@ -122,11 +119,15 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
       }, 5 * 1000)
     } else if (CALLS.length == 1 && one_connected_to_all) {
       console.log('One-to-all overlay network established!')
-      const [[peer_id, _]] = Object.entries(confirmed).filter(([k, v]) => v == N_PEERS - 1)
-      send(dcs[peer_id], { command: { broadcast: true } })
+      const [[overlay_id, _]] = Object.entries(confirmed).filter(([k, v]) => v == N_PEERS - 1)
+      const caller_id = translation_table[prefix_names(overlay_id)]
+      send(dcs[caller_id], { command: { broadcast: true } })
       setTimeout(() => {
         console.log("Ending broadcast")
-        send(dcs[peer_id], {command: {end_broadcast: true}})
+        //send(dcs[caller_id], { command: { end_broadcast: true } })
+        for (let peer_id in dcs) {
+          send(dcs[peer_id], {command: {end_broadcast: true}})
+        }
       }, 5 * 1000)
     }
     return

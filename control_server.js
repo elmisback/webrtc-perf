@@ -122,32 +122,40 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
     // so we check if the overlay network is done being set up.
     confirmed[from] = (confirmed[from] || 0) + 1
     console.log(confirmed)
+    const num_connected_to_all = Object.values(confirmed).filter(v => v == N_PEERS - 1).length
     const all_connected_to_all = Object.values(confirmed).filter(v => v == N_PEERS - 1).length == N_PEERS
-    const one_connected_to_all = Object.values(confirmed).filter(v => v == N_PEERS - 1).length == 1
-    if (CALLS.length > 1 && all_connected_to_all) {
-      console.log('All-to-all overlay network established!')
-      for (let peer_id in dcs) {
-          send(dcs[peer_id], {command: {broadcast: true}})
-      }
+    //const one_connected_to_all = Object.values(confirmed).filter(v => v == N_PEERS - 1).length == 1
+    if (CALLS.length == num_connected_to_all) {
+      console.log(`${num_connected_to_all}-to-all overlay network established!`)
+      const caller_ids = Object.entries(confirmed).filter(([k, v]) => v == N_PEERS - 1)
+        .map(([k, v]) => k)
+        .map(overlay_id => translation_table[prefix_names(overlay_id)])
+
+      // for (let peer_id in dcs) {
+      //     send(dcs[peer_id], {command: {broadcast: true}})
+      // }
+      caller_ids.map(caller_id => send(dcs[caller_id], { command: { broadcast: true } }))
+
       setTimeout(() => {
           console.log("Ending broadcast")
           for (let peer_id in dcs) {
               send(dcs[peer_id], {command: {end_broadcast: true}})
           }
       }, 5 * 1000)
-    } else if (CALLS.length == 1 && one_connected_to_all) {
-      console.log('One-to-all overlay network established!')
-      const [[overlay_id, _]] = Object.entries(confirmed).filter(([k, v]) => v == N_PEERS - 1)
-      const caller_id = translation_table[prefix_names(overlay_id)]
-      send(dcs[caller_id], { command: { broadcast: true } })
-      setTimeout(() => {
-        console.log("Ending broadcast")
-        //send(dcs[caller_id], { command: { end_broadcast: true } })
-        for (let peer_id in dcs) {
-          send(dcs[peer_id], {command: {end_broadcast: true}})
-        }
-      }, 5 * 1000)
     }
+    // else if (CALLS.length == 1 && one_connected_to_all) {
+    //   console.log('One-to-all overlay network established!')
+    //   const [[overlay_id, _]] = Object.entries(confirmed).filter(([k, v]) => v == N_PEERS - 1)
+    //   const caller_id = translation_table[prefix_names(overlay_id)]
+    //   send(dcs[caller_id], { command: { broadcast: true } })
+    //   setTimeout(() => {
+    //     console.log("Ending broadcast")
+    //     //send(dcs[caller_id], { command: { end_broadcast: true } })
+    //     for (let peer_id in dcs) {
+    //       send(dcs[peer_id], {command: {end_broadcast: true}})
+    //     }
+    //   }, 5 * 1000)
+    // }
     return
   }
   translation_table[prefix_names(overlay_id)] = client_id

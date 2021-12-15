@@ -81,11 +81,29 @@ channel.onmessage = (({ data }) => {
 //
 const simple_chain_from_index = (i, n) => ([...new Array(n)].map((_, j) => (((j + i) - 1) % n) + 1).reverse().reduce((acc, e, i) => ({ ...i >= n - 2 ? {} : {self: true}, [e]: acc}), {self: true}))
 
+// Function for building a tree based on node names and an accumulated value (parent_prop). post postprocesses the values (but not the root).
+function build_tree (root, get_children, get_parent_prop=e => null, parent_prop, post) { return {[root]: post(get_children(root, parent_prop).map(k => build_tree(k, get_children, get_parent_prop, get_parent_prop(root, k, parent_prop), post)).reduce((acc, t) => ({...acc, ...t}), {})) } }
+
+const powers_of_2_up_to_n = n => {
+  let helper = (k, A) => 2 ** k >= n ? A : helper(k + 1, [...A, 2 ** k])
+  return helper(0, [])
+}
+
+function kmap (f, o) { return typeof o == 'object' ? Object.entries(o).reduce((acc, [k, v]) => ({...acc, [f(k)]: kmap(f, v)}), {}) : o}
+
+const N_chord_from_index = (N, idx) => {
+  const o = build_tree(0, (n, p) => powers_of_2_up_to_n(N).filter(v => v < p).map(v => v + n).filter(v => v < N), (root, k, p) => k - root < 0 ? (k + N) - root : k - root, N, e => ({ ...e, self: true }))
+  delete o.self
+  delete o[0].self
+  return kmap(i => i == 'self' ? 'self' : (parseInt(i) + idx - 1) % N + 1, o)
+}
+
 const N_PEERS = 5
 let INITED = false
 const ALL_TO_ALL_CHAINS = [...new Array(N_PEERS)].map((_, i) => ({ call_id: i, call: simple_chain_from_index(i + 1, N_PEERS) }))
 const ONE_TO_ALL_CHAIN = [{ call_id: 0, call: simple_chain_from_index(1, N_PEERS) }]
-const CALLS = ONE_TO_ALL_CHAIN
+const ONE_TO_ALL_TREE = [{ call_id: 0, call: N_chord_from_index(5, 1) }]
+const CALLS = ONE_TO_ALL_TREE
 let confirmed = {}
 const translation_table = ({})
 

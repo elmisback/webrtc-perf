@@ -75,6 +75,9 @@ channel.onmessage = (({ data }) => {
 
 const N_PEERS = 5
 let INITED = false
+const ALL2ALL = 'all2all'
+const ONE2ALL = 'one2all'
+const MODE = ALL2ALL
 let confirmed = {}
 const translation_table = ({})
 
@@ -97,19 +100,31 @@ const prefix_names = (old_name) => {
 const handle_report = async ({ client_id, overlay_id, from }) => {
   console.log('handling report', shorten_key(client_id), overlay_id, from)
   if (from) {
+    // A connection establishment test went through,
+    // so we check if the overlay network is done being set up.
     confirmed[from] = (confirmed[from] || 0) + 1
     console.log(confirmed)
-    if (Object.values(confirmed).filter(v => v == N_PEERS - 1).length == N_PEERS) {
-      console.log('Overlay network established!')
-        for (let peer_id in dcs) {
-            send(dcs[peer_id], {command: {broadcast: true}})
-        }
-        setTimeout(() => {
-            console.log("Ending broadcast")
-            for (let peer_id in dcs) {
-                send(dcs[peer_id], {command: {end_broadcast: true}})
-            }
-        }, 5 * 1000)
+    const all_connected_to_all = Object.values(confirmed).filter(v => v == N_PEERS - 1).length == N_PEERS
+    const one_connected_to_all = Object.values(confirmed).filter(v => v == N_PEERS - 1).length == 1
+    if ((MODE == ALL2ALL && all_connected_to_all) {
+      console.log('All-to-all overlay network established!')
+      for (let peer_id in dcs) {
+          send(dcs[peer_id], {command: {broadcast: true}})
+      }
+      setTimeout(() => {
+          console.log("Ending broadcast")
+          for (let peer_id in dcs) {
+              send(dcs[peer_id], {command: {end_broadcast: true}})
+          }
+      }, 5 * 1000)
+    } else if (MODE == ONE2ALL && one_connected_to_all) {
+      console.log('One-to-all overlay network established!')
+      const [[peer_id, _]] = Object.entries(confirmed).filter(([k, v]) => v == N_PEERS - 1)
+      send(dcs[peer_id], { command: { broadcast: true } })
+      setTimeout(() => {
+        console.log("Ending broadcast")
+        send(dcs[peer_id], {command: {end_broadcast: true}})
+      }, 5 * 1000)
     }
     return
   }

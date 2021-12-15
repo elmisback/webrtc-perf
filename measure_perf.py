@@ -75,9 +75,9 @@ mixed_lan_links = {
             "h1": {"up": 10, "down": 100},
             "s2": {
                 "peers": {
-                    "c1": {"up": 100, "down": 100},
-                    "c2": {"up": 100, "down": 100},
-                    "c3": {"up": 100, "down": 100},
+                    "c1": {"up": 100, "down": 100, "delay": 1},
+                    "c2": {"up": 100, "down": 100, "delay": 1},
+                    "c3": {"up": 100, "down": 100, "delay": 1},
                 },
                 "attributes":  {"up": 20, "down": 20}
             },
@@ -131,21 +131,22 @@ class PerfTopo(Topo):
             switch = self.addSwitch(switch_name)
             if parent_switch:
                 attributes = layer["attributes"]
+                delay = attributes.get("delay", 10)
                 self.addLink(switch,
                              parent_switch, cls=AsymTCLink,
-                             params1={"bw": attributes["down"], "delay": '5ms', "max_queue_size": args.maxq},
-                             params2={"bw": attributes["up"], "delay": '5ms', "max_queue_size": args.maxq})
+                             params1={"bw": attributes["down"], "delay": f'{delay}ms', "max_queue_size": args.maxq},
+                             params2={"bw": attributes["up"], "delay": f'{delay}ms', "max_queue_size": args.maxq})
             for key, value in layer["peers"].items():
                 if "up" not in value.keys():
                     # This entry represents another switch
                     setup_layer(key, value, switch)
                     continue
                 host = self.addHost(key)
-
+                delay = value.get("delay", 10)
                 self.addLink(switch,
                              host, cls=AsymTCLink,
-                             params1={"bw": value["down"], "delay": '5ms', "max_queue_size": args.maxq},
-                             params2={"bw": value["up"], "delay": '5ms', "max_queue_size": args.maxq})
+                             params1={"bw": value["down"], "delay": f'{delay}ms', "max_queue_size": args.maxq},
+                             params2={"bw": value["up"], "delay": f'{delay}ms', "max_queue_size": args.maxq})
         setup_layer("s1", layout["s1"], None)
 
 def start_lookup_server(net, name):
@@ -195,11 +196,9 @@ def measure_perf():
     # links.
     dumpNodeConnections(net.hosts)
     # This performs a basic all pairs ping test.
-    net.pingAll()
+    #net.pingAll()
 
     # We expect one of each of these roles
-
-
     lookup_host = roles["lookup"]
     start_lookup_server(net, lookup_host)
     party_host = roles["host"]

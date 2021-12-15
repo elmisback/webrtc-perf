@@ -122,7 +122,9 @@ const NONTRIV2 = [
   build_broadcast_tree(3, root => ({ 3: [1, 2, 4], 4: [5, 7], 5: [6], 7: [8] })[root] || [])
 ].map((t, i) => ({ call_id: i, call: t }))
 const uniq = A => [...new Set(A)]
-const CALLS = NONTRIV2
+
+const CALLS = NONTRIV2   // USAGE set the example to run here
+
 const N_PEERS = uniq(traverse(CALLS[0], t => Object.keys(t)).flat()).filter(e => !['self', 'call_id', 'call'].includes(e)).length
 let confirmed = {}
 const translation_table = ({})

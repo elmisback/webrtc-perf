@@ -27,6 +27,8 @@ if (key_name) {
 }
 let channel = await connectToHost({host: host_public_key, auth_key_pair: auth_key_pair, signalling_hostname: signalling_hostname})
 
+const TEST_DURATION = 15
+
 channel.onmessage = (({ data }) => {
   // handle signalling messages here
   data = JSON.parse(data)
@@ -158,7 +160,7 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
       console.log(`${num_connected_to_all}-to-all overlay network established!`)
       const caller_ids = Object.entries(confirmed).filter(([k, v]) => v == N_PEERS - 1)
         .map(([k, v]) => k)
-        .map(overlay_id => translation_table[prefix_names(overlay_id)])
+        .map(overlay_id => translation_table[overlay_id])
 
       // for (let peer_id in dcs) {
       //     send(dcs[peer_id], {command: {broadcast: true}})
@@ -170,11 +172,11 @@ const handle_report = async ({ client_id, overlay_id, from }) => {
           for (let peer_id in dcs) {
               send(dcs[peer_id], {command: {end_broadcast: true}})
           }
-      }, 5 * 1000)
+      }, TEST_DURATION * 1000)
     }
     return
   }
-  translation_table[prefix_names(overlay_id)] = client_id
+  translation_table[overlay_id] = client_id
   const overlay_ids = Object.keys(translation_table)
   console.log(overlay_ids.length, 'have arrived out of', N_PEERS)
   if (overlay_ids.length < N_PEERS || INITED) return;

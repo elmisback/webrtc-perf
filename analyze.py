@@ -40,15 +40,16 @@ def make_plots():
     last_received_by_pair = data.groupby(["From", "To"])["Seq"].max()
     print(last_received_by_pair)
 
-    g = sns.FacetGrid(data, col="From", col_order=["c1", "c2", "c3", "c4", "c5"])
+    g = sns.FacetGrid(data, col="From", col_order=sorted(data["From"].unique()))
     g.map_dataframe(sns.lineplot, x="SentTime", y="TripTime", hue="To")
-    g.add_legend()
-    plt.show()
+    g.add_legend(label_order=sorted(data["To"].unique()))
+    plt.savefig("latencies.pdf", format="pdf", bbox_inches="tight")
 
     # Consistency check: Are we sending data on time, or is the process getting bogged down and missing sends?
-    g = sns.FacetGrid(data, col="From", col_order=["c1", "c2", "c3", "c4", "c5"])
+    g = sns.FacetGrid(data, col="From", col_order=sorted(data["From"].unique()))
     g.map_dataframe(sns.lineplot, x="Seq", y="SentTime", hue="To")
-    g.add_legend()
+    g.add_legend(label_order=sorted(data["To"].unique()))
+    plt.savefig("seq-v-time.pdf", format="pdf", bbox_inches="tight")
     plt.show()
 
 

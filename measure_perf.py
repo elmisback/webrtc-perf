@@ -13,39 +13,26 @@ from mininet.topo import Topo
 from mininet.util import dumpNodeConnections
 
 parser = ArgumentParser(description="tests")
-parser.add_argument('--bw-host', '-B',
-                    type=float,
-                    help="Bandwidth of host links (Mb/s)",
-                    default=1000)
-
-
 
 parser.add_argument('--delay',
                     type=float,
                     help="Link propagation delay (ms)",
-                    required=True)
+                    default=10)
 
 parser.add_argument('--dir', '-d',
                     help="Directory to store outputs",
                     required=True)
 
-parser.add_argument('--time', '-t',
-                    help="Duration (sec) to run the experiment",
-                    type=int,
-                    default=10)
 
 parser.add_argument('--maxq',
                     type=int,
                     help="Max buffer size of network interface in packets",
                     default=100)
 
-# Linux uses CUBIC-TCP by default that doesn't have the usual sawtooth
-# behaviour.  For those who are curious, invoke this script with
-# --cong cubic and see what happens...
-# sysctl -a | grep cong should list some interesting parameters.
+# Use the linux default congestion control
 parser.add_argument('--cong',
                     help="Congestion control algorithm to use",
-                    default="reno")
+                    default="cubic")
 
 # Expt parameters
 args = parser.parse_args()
@@ -57,14 +44,70 @@ homogenous_links = {
         "peers": {
             "h0": {"up": 200, "down": 200},
             "h1": {"up": 10, "down": 100},
-            "c1": {"up": 8, "down": 20},
-            "c2": {"up": 8, "down": 20},
-            "c3": {"up": 8, "down": 20},
-            "c4": {"up": 8, "down": 20},
-            "c5": {"up": 8, "down": 20},
-            "h7": {"up": 8, "down": 20},
+            "h2": {"up": 8, "down": 24},
+            "c1": {"up": 8, "down": 24},
+            "c2": {"up": 8, "down": 24},
+            "c3": {"up": 8, "down": 24},
+            "c4": {"up": 8, "down": 24},
+            "c5": {"up": 8, "down": 24},
+
         },
         "attributes":  {"up": 10, "down": 20}
+       }
+}
+
+bottleneck_link = {
+    "s1": {
+        "peers": {
+            "h0": {"up": 200, "down": 200},
+            "h1": {"up": 10, "down": 100},
+            "h2": {"up": 8, "down": 24},
+            "c1": {"up": 3, "down": 24},
+            "c2": {"up": 8, "down": 24},
+            "c3": {"up": 8, "down": 24},
+            "c4": {"up": 8, "down": 24},
+            "c5": {"up": 8, "down": 24},
+
+        },
+        "attributes":  {"up": 8, "down": 24}
+       }
+}
+
+homogenous_links_big = {
+    "s1": {
+        "peers": {
+            "h0": {"up": 200, "down": 200},
+            "h1": {"up": 10, "down": 100},
+            "h2": {"up": 8, "down": 24},
+            "c1": {"up": 8, "down": 24},
+            "c2": {"up": 8, "down": 24},
+            "c3": {"up": 8, "down": 24},
+            "c4": {"up": 8, "down": 24},
+            "c5": {"up": 8, "down": 24},
+            "c6": {"up": 8, "down": 24},
+            "c7": {"up": 8, "down": 24},
+            "c8": {"up": 8, "down": 24},
+            "c9": {"up": 8, "down": 24},
+            "c10": {"up": 8, "down": 24},
+            "c11": {"up": 8, "down": 24},
+            "c12": {"up": 8, "down": 24},
+            "c13": {"up": 8, "down": 24},
+            "c14": {"up": 8, "down": 24},
+            "c15": {"up": 8, "down": 24},
+            "c16": {"up": 8, "down": 24},
+            "c17": {"up": 8, "down": 24},
+            "c18": {"up": 8, "down": 24},
+            "c19": {"up": 8, "down": 24},
+            "c20": {"up": 8, "down": 24},
+            "c21": {"up": 8, "down": 24},
+            "c22": {"up": 8, "down": 24},
+            "c23": {"up": 8, "down": 24},
+            "c24": {"up": 8, "down": 24},
+            "c25": {"up": 8, "down": 24},
+            "c26": {"up": 8, "down": 24},
+
+        },
+        "attributes":  {"up": 8, "down": 24}
        }
 }
 
@@ -73,6 +116,7 @@ mixed_lan_links = {
         "peers" : {
             "h0": {"up": 200, "down": 200},
             "h1": {"up": 10, "down": 100},
+            "h2": {"up": 8, "down": 24},
             "s2": {
                 "peers": {
                     "c1": {"up": 100, "down": 100, "delay": 1},
@@ -82,17 +126,16 @@ mixed_lan_links = {
                 "attributes":  {"up": 20, "down": 20}
             },
             "c4": {"up": 40, "down": 40},
-            "c5": {"up": 8, "down": 20},
-            "c6": {"up": 8, "down": 20},
-            "c7": {"up": 8, "down": 20},
-            "c8": {"up": 8, "down": 20},
-            "h7": {"up": 8, "down": 20}
+            "c5": {"up": 8, "down": 24},
+            "c6": {"up": 8, "down": 24},
+            "c7": {"up": 8, "down": 24},
+            "c8": {"up": 8, "down": 24},
             },
-        "attributes":  {"up": 10, "down": 20}
+        "attributes":  {"up": 8, "down": 24}
     }
 }
 
-roles = {"lookup": "h0", "host": "h1", "control": "h7"}
+roles = {"lookup": "h0", "host": "h1", "control": "h2"}
 
 
 class AsymTCLink(TCLink):
@@ -131,7 +174,7 @@ class PerfTopo(Topo):
             switch = self.addSwitch(switch_name)
             if parent_switch:
                 attributes = layer["attributes"]
-                delay = attributes.get("delay", 10)
+                delay = attributes.get("delay", args.delay)
                 self.addLink(switch,
                              parent_switch, cls=AsymTCLink,
                              params1={"bw": attributes["down"], "delay": f'{delay}ms', "max_queue_size": args.maxq},
@@ -142,7 +185,7 @@ class PerfTopo(Topo):
                     setup_layer(key, value, switch)
                     continue
                 host = self.addHost(key)
-                delay = value.get("delay", 10)
+                delay = value.get("delay", args.delay)
                 self.addLink(switch,
                              host, cls=AsymTCLink,
                              params1={"bw": value["down"], "delay": f'{delay}ms', "max_queue_size": args.maxq},
@@ -218,7 +261,7 @@ def measure_perf():
         else:
             raise RuntimeError("No role for " + key)
     print("Processes started. Letting things run...")
-    sleep(25)
+    sleep(30)
     print("Done. Shutting down.")
     net.stop()
     # Ensure that all processes you create within Mininet are killed.

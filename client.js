@@ -88,7 +88,6 @@ function handle_command({ test, report, broadcast, end_broadcast, call_id, from,
         return;
     }
     if (broadcast) {
-        output_log = []
         console.log("Broadcast started")
         broadcast_interval = setInterval(() => {
             broadcast_counter += 1
@@ -107,6 +106,7 @@ function handle_command({ test, report, broadcast, end_broadcast, call_id, from,
         clearInterval(broadcast_interval)
         // This is a big buffer. Avoid console.log truncation with direct stdout
         process.stdout.write(JSON.stringify(output_log) + '\n');
+        output_log = []
         return;
     }
 
@@ -126,7 +126,14 @@ function handle_command({ test, report, broadcast, end_broadcast, call_id, from,
                 channel.onmessage = ({ data }) => {
                     //console.log("here", data)
                     const temp = JSON.parse(data)
-                    output_channels.map(dc => send(dc, {...temp, last: overlay_id, hops: temp.hops+1, call_id}))
+                    // HACK: This should just be done when a test starts
+                    /*if (output_log.length === 0) {
+                        output_log = [{num_output_channels: output_channels.length + outputs.length}]
+                    }*/
+                    output_channels.map(dc => {
+                        output_log.push({forwarded: data.length, time: Date.now()})
+                        send(dc, {...temp, last: overlay_id, hops: temp.hops+1, call_id})
+                    })
                     if (receive) { // NOTE this will try parsing all the data received...
                         const out = JSON.parse(data)
                         if (out.test) send(dcs[controller_id], ({ report: { ...out, receiver: overlay_id } }))

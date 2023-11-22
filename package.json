@@ -12,7 +12,6 @@
     "@types/node": "^16.7.10",
     "node-gyp": "^8.4.0",
     "node-pre-gyp": "^0.17.0",
-    "wrtc": "^0.4.7",
     "ws": "^8.2.3"
   },
   "dependencies": {
@@ -121,6 +120,7 @@
     "which": "^2.0.2",
     "wide-align": "^1.1.5",
     "wrappy": "^1.0.2",
+    "wrtc": "^0.4.7",
     "yallist": "^4.0.0"
   },
   "repository": {
